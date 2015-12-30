@@ -17,9 +17,11 @@ public class Token {
         header = new Header(ACTION);
     }
 
-    public Token(Boolean accepted) {
-        this();
-        this.accepted = accepted;
+    public Token(String username, String key, Long expiry) {
+        this.header = new Header(ACTION);
+        this.key = key;
+        this.expiry = expiry;
+        this.username = username;
     }
 
     public Boolean getAccepted() {

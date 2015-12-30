@@ -6,6 +6,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Verticle;
 import io.vertx.core.Vertx;
 
+import java.util.Date;
 import java.util.UUID;
 
 /**
@@ -39,7 +40,9 @@ public class UserVerticle implements Verticle {
 
                     event.handler(data -> {
                         Index index = (Index) Serializer.unpack(data.toString(), Index.class);
-                        connect(index);
+
+                        if (!index.getFull())
+                            connect(index);
                     });
 
                     sendBus(event.textHandlerID(), new Lookup(room));
@@ -52,23 +55,38 @@ public class UserVerticle implements Verticle {
             event.handler(data -> {
                 Packet packet = (Packet) Serializer.unpack(data.toString(), Packet.class);
 
-                if (packet != null) {
-                    switch (packet.getAction()) {
-                        case Authenticate.ACTION:
-                            sendBus(event.textHandlerID(), new Join("Public room"));
-                            break;
-                        default:
-                            break;
-                    }
+                switch (packet.getAction()) {
+                    case Authenticate.ACTION:
+                        sendBus(event.textHandlerID(), new Join("Public room"));
+                        break;
+                    case Token.ACTION:
+                        sendBus(event.textHandlerID(), new Join("Public room"));
+                    default:
+                        break;
                 }
+
             });
 
-            sendBus(event.textHandlerID(), new Authenticate(UUID.randomUUID().toString(), "pass_kitten"));
+            if (Configuration.USE_TOKEN_AUTH)
+                authenticateAccountByToken(event.textHandlerID());
+            else
+                sendBus(event.textHandlerID(), new Authenticate(UUID.randomUUID().toString(), "pass_kitten"));
 
             vertx.setPeriodic(Configuration.MESSAGE_RATE, timer -> {
-                sendBus(event.textHandlerID(), new Message(UUID.randomUUID().toString()));
+                sendBus(event.textHandlerID(), new Message("message-message-message"));
             });
         });
+    }
+
+    private void authenticateAccountByToken(String address) {
+        String username = UUID.randomUUID().toString();
+        Long expiry = new Date().getTime() * 1000;
+        try {
+            String key = Authentication.SignToken(username, expiry);
+            sendBus(address, new Token(username, key, expiry));
+        } catch (TokenException e) {
+            e.printStackTrace();
+        }
     }
 
     private void sendBus(String address, Object data) {
